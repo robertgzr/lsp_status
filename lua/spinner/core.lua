@@ -1,10 +1,5 @@
---[[ This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at https://mozilla.org/MPL/2.0/. ]]
+local redraw = require('spinner.redraw')
 
-local lsp = vim.lsp
-
-local redraw = require 'lsp_status.redraw'
 local clients = {} -- indexed by client ID
 local config = {
   spinner = {'-', '\\', '|', '/'},
@@ -12,16 +7,7 @@ local config = {
   redraw_rate = 100,
 }
 
-local function clean_stopped_clients()
-  for id, client in ipairs(clients) do
-    if lsp.client_is_stopped(id) then
-      if client.timer then
-        client.timer:close()
-      end
-      table.remove(clients, id)
-    end
-  end
-end
+local M = {}
 
 local function find_index(tb, value)
   for i, v in ipairs(tb) do
@@ -31,13 +17,12 @@ local function find_index(tb, value)
   end
 end
 
-local function progress_callback(_, _, msg, client_id)
-  local val = msg.value
+function M.on_progress(event, job_id, client_id)
   if not clients[client_id] then
     return
   end
-  if val.kind == 'begin' then
-    table.insert(clients[client_id].jobs, msg.token)
+  if event == 'begin' then
+    table.insert(clients[client_id].jobs, job_id)
     if not clients[client_id].timer then
       local timer = vim.loop.new_timer()
       clients[client_id].timer = timer
@@ -49,9 +34,9 @@ local function progress_callback(_, _, msg, client_id)
         redraw.redraw()
       end))
     end
-  elseif val.kind == 'end' then
+  elseif event == 'end' then
     local jobs = clients[client_id].jobs
-    local index = find_index(jobs, msg.token)
+    local index = find_index(jobs, job_id)
     table.remove(jobs, index)
     if vim.tbl_isempty(jobs) then
       clients[client_id].timer:stop()
@@ -64,7 +49,7 @@ end
 
 local function get_clients_by_bufnr(bufnr)
   local ids = {}
-  for id, client in ipairs(clients) do
+  for id, client in pairs(clients) do
     if vim.tbl_contains(client.buffers, bufnr) then
       table.insert(ids, id)
     end
@@ -72,9 +57,8 @@ local function get_clients_by_bufnr(bufnr)
   return ids
 end
 
-local function get_status(bufnr)
+function M.get_status(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
-  clean_stopped_clients()
   local status = ''
   local ids = get_clients_by_bufnr(bufnr)
   for i, id in ipairs(ids) do
@@ -90,28 +74,10 @@ local function get_status(bufnr)
   return status
 end
 
-local function init_capabilities(capabilities)
-  vim.validate {
-    capabilities = {
-      capabilities, function(c)
-        if not type(c) == 'table' then
-          return false
-        end
-        if type(c.window) == 'table' then
-          return true
-        end
-      end, 'capabilities.window = table',
-    },
-  }
-  if not capabilities.window.workDoneProgress then
-    capabilities.window.workDoneProgress = true
-  end
-end
-
-local function setup(_config)
+function M.setup(opts)
   vim.validate {
     config = {
-      _config, function(c)
+      opts, function(c)
         if c and type(c) ~= 'table' then
           return false
         end
@@ -132,28 +98,30 @@ local function setup(_config)
       ]],
     },
   }
-  if _config then
-    config = vim.tbl_extend('force', config, _config)
+  if opts then
+    config = vim.tbl_extend('force', config, opts)
   end
-  lsp.handlers['$/progress'] = progress_callback
   redraw.init(config)
 end
 
-local function on_attach(client, bufnr)
-  if not clients[client.id] then
-    clients[client.id] = {name = client.name, jobs = {}, buffers = {bufnr}}
+function M.on_attach(client_id, client_name, bufnr)
+  if not clients[client_id] then
+    clients[client_id] = {name = client_name or client_id, jobs = {}, buffers = {bufnr}}
   else
-    if not vim.tbl_contains(clients[client.id].buffers, bufnr) then
-      table.insert(clients[client.id].buffers, bufnr)
+    if not vim.tbl_contains(clients[client_id].buffers, bufnr) then
+      table.insert(clients[client_id].buffers, bufnr)
     end
   end
 end
 
-local M = {
-  setup = setup,
-  on_attach = on_attach,
-  init_capabilities = init_capabilities,
-  status = get_status,
-}
+function M.on_exit(_, _, client_id)
+  if not clients[client_id] then
+    return
+  end
+  if clients[client_id].timer then
+    clients[client_id].timer:close()
+  end
+  clients[client_id] = nil
+end
 
 return M
