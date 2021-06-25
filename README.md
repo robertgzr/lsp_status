@@ -38,6 +38,12 @@ lspconfig.rust_analyzer.setup {  -- Rust Analyzer setup
 }
 ```
 
+### use the jobstart wrapper
+
+```lua
+require('spinner.job').jobstart({vim.env.SHELL, '-c', 'sleep 2'})
+```
+
 ### get status
 
 just call the method `status`
