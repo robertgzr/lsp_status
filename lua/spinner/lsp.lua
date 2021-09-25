@@ -32,7 +32,8 @@ end
 
 function M.on_attach(client, bufnr)
   spinner.on_attach(client.id, client.name, bufnr)
-  client.on_exit = spinner.on_exit
 end
+
+M.on_exit = spinner.on_exit
 
 return M

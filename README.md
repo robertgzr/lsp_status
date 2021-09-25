@@ -31,9 +31,15 @@ local function on_attach(client, bufnr)
 
   spinner.lsp.on_attach(client, bufnr)
 end
+local function on_exit(code, signal, client_id)
+  -- ... other stuff
+
+  spinner.lsp.on_exit(code, signal, client_id)
+end
 
 lspconfig.rust_analyzer.setup {  -- Rust Analyzer setup
   on_attach = on_attach,
+  on_exit = on_exit,
   capabilities = capabilities
 }
 ```
