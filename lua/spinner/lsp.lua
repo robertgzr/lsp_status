@@ -23,9 +23,9 @@ end
 
 function M.setup()
   local lsp_progress_handler = lsp.handlers['$/progress']
-  local function progress_handler(_, _, params, client_id)
-    spinner.on_progress(params.value.kind, params.token, client_id)
-    lsp_progress_handler(nil, nil, params, client_id)
+  local function progress_handler(_, result, client_id)
+    spinner.on_progress(result.value.kind, result.token, client_id)
+    lsp_progress_handler(nil, result, client_id)
   end
   lsp.handlers['$/progress'] = progress_handler
 end

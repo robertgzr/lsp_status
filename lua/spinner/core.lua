@@ -28,6 +28,9 @@ function M.on_progress(event, job_id, client_id)
       clients[client_id].timer = timer
       clients[client_id].frame = 1
       timer:start(config.interval, config.interval, vim.schedule_wrap(function()
+        if clients[client_id] == nil then
+          return M.on_exit(nil, nil, client_id) -- handle early exit of client
+        end
         clients[client_id].frame =
           clients[client_id].frame < #config.spinner and
             clients[client_id].frame + 1 or 1
@@ -65,7 +68,7 @@ function M.get_status(bufnr)
     local client = clients[id]
     status = string.format('%s%s', status, client.name)
     if not vim.tbl_isempty(client.jobs) then
-      status = string.format('%s %s', status, config.spinner[client.frame])
+      status = string.format('%s %s', config.spinner[client.frame], status)
     end
     if i < vim.tbl_count(ids) then
       status = string.format('%s ', status)
@@ -122,6 +125,7 @@ function M.on_exit(_, _, client_id)
     clients[client_id].timer:close()
   end
   clients[client_id] = nil
+  table.remove(clients, client_id)
 end
 
 return M
